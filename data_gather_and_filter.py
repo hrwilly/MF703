@@ -20,7 +20,7 @@ def get_tickers(file_path, list_time_max):
     
     return symbol_list
     
-folder_path = 'All stocks in US market/'
+
 file_name_list = ['NASDAQ.csv', 'NYSE.csv', 'AMEX.csv']
 symbols = []
 for file in file_name_list:
