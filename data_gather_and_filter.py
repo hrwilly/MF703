@@ -20,7 +20,7 @@ def get_tickers(file_path, list_time_max):
     
     return symbol_list
     
-folder_path = '/All stocks in US market/'
+folder_path = 'All stocks in US market/'
 file_name_list = ['NASDAQ.csv', 'NYSE.csv', 'AMEX.csv']
 symbols = []
 for file in file_name_list:
@@ -52,8 +52,8 @@ def getHistory(symbols, period, start_date, end_date, save_path=None):
 
 
 
-getHistory(symbols, period = '1d', start_date = '2011-01-01', end_date = '2023-11-22', save_path = '/original data')
-Close = pd.read_csv('/original data/Close.csv', index_col=0)
+getHistory(symbols, period = '1d', start_date = '2011-01-01', end_date = '2023-11-22', save_path = 'original data')
+Close = pd.read_csv('original data/Close.csv', index_col=0)
 Close.index = pd.to_datetime(Close.index)
 close_non_null_counts = Close.count()
 close_threshold = 0.75 * len(Close)
@@ -62,17 +62,17 @@ close_data.index = pd.to_datetime(close_data.index, utc=True).tz_localize(None).
 month_counts = close_data.index.to_period("M").value_counts()
 under_15_months = month_counts[month_counts < 15].index
 close_data = close_data[~close_data.index.to_period("M").isin(under_15_months)]
-close_data.to_csv('/Users/liyihan/Documents/GitHub/MF703/filtered_data/close_data.csv')
+close_data.to_csv('filtered_data/close_data.csv')
 
 
-Open = pd.read_csv('/original data/Open.csv', index_col=0)
+Open = pd.read_csv('original data/Open.csv', index_col=0)
 Open.index = pd.to_datetime(Open.index)
 open_non_null_counts = Open.count()
 open_threshold = 0.75 * len(Open)
 open_data = Open.loc[:, open_non_null_counts >= open_threshold]
 open_data.index = pd.to_datetime(open_data.index, utc=True).tz_localize(None).date
 open_data = open_data[~open_data.index.to_period("M").isin(under_15_months)]
-open_data.to_csv('/filtered_data/open_data.csv')
+open_data.to_csv('filtered_data/open_data.csv')
 
 
 
