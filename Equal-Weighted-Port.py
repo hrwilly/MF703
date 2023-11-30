@@ -19,6 +19,7 @@ def load_data(file_path, start_date, end_date):
 
 
 def get_quantile(df):
+    df = df.apply(pd.to_numeric, errors='coerce')
     df_ranks = df.apply(lambda x: pd.qcut(x, 10, labels=False, duplicates='drop'), axis=1)
     return df_ranks
 
@@ -45,8 +46,6 @@ def cal_portfolio_return(df, return_df, ff3_df, quantile):
         values = return_df.loc[index][return_df.columns.isin(stocks_list)]
         value_equally = 100 * values.mean()
         portfolio_return.at[portfolio_return.index[i], 'EquallyWeightedReturn'] = value_equally
-    
-
     return portfolio_return
 
 def get_quantile_returns(df, return_df, ff3_df):
@@ -129,11 +128,53 @@ def result_report(excess_df, capm_df, ff_df):
     return result
 
 
+#   Hedge Part
 
-return_df = load_data('variable_results/monthly_returns.csv', '2012-01', '2023-10')
-ff3_df = load_data('filtered_data/ff3.csv', '2012-01', '2023-10')
-ab_nr_df = load_data('variable_results/abnormal_negative_ratio.csv', '2012-01', '2023-10')
-ab_pr_df = load_data('variable_results/abnormal_positive_ratio.csv', '2012-01', '2023-10')
+def cal_hedge_portfolio_return(df, return_df, ff3_df, quantile, other_df):
+    stocks_result = get_stocks_in_quantile(df, quantile)
+    portfolio_return = pd.DataFrame(index=return_df.index[1:], columns=['EquallyWeightedReturn'])
+    for i in range(len(df)-1):
+        stocks_list = stocks_result.iloc[i]
+        stocks_list = stocks_list.iloc[0].split(', ')
+        index = return_df.index[i+1]
+        index_other = other_df.index[i]
+        
+        other_values_series = other_df.loc[index_other][other_df.columns.isin(stocks_list)]
+        other_values = other_values_series.to_frame()
+        other_values = other_values.T
+        stocks_result_low = get_stocks_in_quantile(other_values, 0)
+        stocks_list_low = stocks_result_low.iloc[0]
+        stocks_list_low = stocks_list_low.iloc[0].split(', ')
+        
+        stocks_result_high = get_stocks_in_quantile(other_values, 9)
+        stocks_list_high = stocks_result_high.iloc[0]
+        stocks_list_high = stocks_list_high.iloc[0].split(', ')
+
+            
+        values_high = return_df.loc[index][return_df.columns.isin(stocks_list_high)]
+        values_low = return_df.loc[index][return_df.columns.isin(stocks_list_low)]
+
+        value_equally_high = 100 * values_high.mean()
+        value_equally_low = 100 * values_low.mean()
+        
+        value_equally = value_equally_high - value_equally_low
+        portfolio_return.at[portfolio_return.index[i], 'EquallyWeightedReturn'] = value_equally
+        
+    return portfolio_return
+
+def get_quantile_hedge_returns(df, return_df, ff3_df, other_df):
+    quantile_returns = pd.DataFrame()
+    for quantile in range(10):
+        quantile_returns[quantile+1] = cal_hedge_portfolio_return(df, return_df, ff3_df, quantile, other_df)
+    
+    quantile_returns[11] = quantile_returns[10]-quantile_returns[1]
+    return quantile_returns
+
+
+return_df = load_data('Final Variables/monthly_returns.csv', '2014-01', '2022-12')
+ff3_df = load_data('filtered_data/ff3.csv', '2014-01', '2022-12')
+ab_nr_df = load_data('Final Variables/abnormal_negative_ratio.csv', '2014-01', '2022-12')
+ab_pr_df = load_data('Final Variables/abnormal_positive_ratio.csv', '2014-01', '2022-12')
 
 ABNR_quantile_returns = get_quantile_returns(ab_nr_df, return_df, ff3_df)
 ABPR_quantile_returns = get_quantile_returns(ab_pr_df, return_df, ff3_df)
@@ -145,12 +186,32 @@ ABPR_excess = pd.DataFrame(round(ABPR_quantile_returns.mean(), 2), columns=['Exc
 ABNR_CAPM = cal_CAPM(ABNR_quantile_returns, ff3_df)
 ABNR_FF3 = cal_Fama_French(ABNR_quantile_returns, ff3_df)
 ABNR_result = result_report(ABNR_excess, ABNR_CAPM, ABNR_FF3).T
-ABNR_result.to_csv('Equally_Weighted_Portfolio/ABNR_result.csv')
+ABNR_result.to_csv('Equally_Weighted_Portfolio/sp500_ABNR_result.csv')
 
 ABPR_CAPM = cal_CAPM(ABPR_quantile_returns, ff3_df)
 ABPR_FF3 = cal_Fama_French(ABPR_quantile_returns, ff3_df)
 ABPR_result = result_report(ABPR_excess, ABPR_CAPM, ABPR_FF3).T
-ABPR_result.to_csv('Equally_Weighted_Portfolio/ABPR_result.csv')
+ABPR_result.to_csv('Equally_Weighted_Portfolio/sp500_ABPR_result.csv')
 
 
-    
+#   Hedge Part
+size = load_data('Final Variables/monthly_size.csv', '2014-01', '2022-12')
+
+hedge_ABNR_quantile_returns = get_quantile_hedge_returns(size, return_df, ff3_df, ab_nr_df)
+hedge_ABPR_quantile_returns = get_quantile_hedge_returns(size, return_df, ff3_df, ab_pr_df)
+
+hedge_ABNR_excess = pd.DataFrame(round(hedge_ABNR_quantile_returns.mean(), 2), columns=['Excess'])
+hedge_ABPR_excess = pd.DataFrame(round(hedge_ABPR_quantile_returns.mean(), 2), columns=['Excess'])
+
+
+
+hedge_ABNR_CAPM = cal_CAPM(hedge_ABNR_quantile_returns, ff3_df)
+hedge_ABNR_FF3 = cal_Fama_French(hedge_ABNR_quantile_returns, ff3_df)
+hedge_ABNR_result = result_report(hedge_ABNR_excess, hedge_ABNR_CAPM, hedge_ABNR_FF3).iloc[:-1]
+hedge_ABNR_result.to_csv('Equally_Weighted_Portfolio/sp500_hedge_ABNR_result.csv')
+
+hedge_ABPR_CAPM = cal_CAPM(hedge_ABPR_quantile_returns, ff3_df)
+hedge_ABPR_FF3 = cal_Fama_French(hedge_ABPR_quantile_returns, ff3_df)
+hedge_ABPR_result = result_report(hedge_ABPR_excess, hedge_ABPR_CAPM, hedge_ABPR_FF3).iloc[:-1]
+hedge_ABPR_result.to_csv('Equally_Weighted_Portfolio/sp500_hedge_ABPR_result.csv')
+
