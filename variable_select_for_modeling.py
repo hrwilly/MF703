@@ -119,9 +119,11 @@ def expand_annual_data_to_monthly(annual_data, year_column_name):
     return monthly_data
 
 monthly_size = expand_annual_data_to_monthly(size, 'Unnamed: 0')
-market_size.fillna(0, inplace=True)
+monthly_size  = monthly_size.apply(pd.to_numeric,errors='coerce')
+monthly_size.fillna(0, inplace=True)
 monthly_PB = expand_annual_data_to_monthly(PB, 'Unnamed: 0')
 monthly_tot_asset = expand_annual_data_to_monthly(tot_asset, 'Unnamed: 0')
+
 monthly_size.to_csv('Final Variables/monthly_size.csv')
 monthly_PB.to_csv('Final Variables/monthly_PB.csv')
 monthly_tot_asset.to_csv('Final Variables/monthly_tot_asset.csv')
