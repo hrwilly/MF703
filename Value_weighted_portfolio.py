@@ -178,11 +178,11 @@ def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_cap_df, ff_f
     return pd.DataFrame(hedge_results)
 
 
-returns_df = load_data('monthly_returns-2.csv', '2021-01', '2022-12')
-ff3_factors = load_data('ff3.csv', '2021-01', '2022-12')
-ab_nr_df = load_data('abnormal_negative_ratio.csv', '2021-01', '2022-12')
-ab_pr_df = load_data('abnormal_positive_ratio.csv', '2021-01', '2022-12')
-market_cap_df = load_data('dummy_market_caps.csv', '2021-01', '2022-12')
+returns_df = load_data('Final Variables/monthly_returns.csv', '2014-01', '2022-12')
+ff3_factors = load_data('filtered_data/ff3.csv', '2014-01', '2022-12')
+ab_nr_df = load_data('Final Variables/abnormal_negative_ratio.csv', '2014-01', '2022-12')
+ab_pr_df = load_data('Final Variables/abnormal_positive_ratio.csv', '2014-01', '2022-12')
+market_cap_df = load_data('dummy_market_caps.csv', '2014-01', '2022-12')
 market_factor = ff3_factors[['Mkt-RF']]
                             
 abnr_ranks = rank_deciles(ab_nr_df)
