@@ -105,3 +105,21 @@ illiquidity = illiquidity[intersection_result]
 illiquidity.to_csv('Final Variables/monthly_illiquidity.csv')
 
 
+def expand_annual_data_to_monthly(annual_data, year_column_name):
+    annual_data.set_index(year_column_name, inplace=True)
+    if not np.issubdtype(annual_data.index.dtype, np.integer):
+        raise ValueError("Index must be of integer type representing years.")
+    annual_data.index.name = 'Year'
+    monthly_data = pd.DataFrame()
+    for year in annual_data.index:
+        year_data = pd.DataFrame(np.tile(annual_data.loc[year].values, (12, 1)), 
+                                 columns=annual_data.columns)
+        year_data.index = pd.date_range(start=f'{year}-01-01', periods=12, freq='M')
+        monthly_data = monthly_data.append(year_data)
+    return monthly_data
+
+monthly_size = expand_annual_data_to_monthly(size, 'Unnamed: 0')
+monthly_PB = expand_annual_data_to_monthly(PB, 'Unnamed: 0')
+
+monthly_size.to_csv('Final Variables/monthly_size.csv')
+monthly_PB.to_csv('Final Variables/monthly_PB.csv')
