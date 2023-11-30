@@ -34,7 +34,10 @@ size_list = filter_data('filtered_data/spx size.xlsx', 2022)[1]
 tot_asset = filter_data('filtered_data/spx total asset.xlsx', 2022)[0]
 tot_asset_list = filter_data('filtered_data/spx total asset.xlsx', 2022)[1]
 
-intersection_result = list(set(AB_PR_list).intersection(gross_profit_list, PB_list, turnover_list, size_list, tot_asset_list))
+cum_sum = pd.read_csv('original data/control variables/cumsum_6mo.csv', index_col=0)
+illiquidity = pd.read_csv('original data/control variables/illiquidity.csv', index_col=0)
+
+intersection_result = list(set(AB_PR_list).intersection(gross_profit_list, PB_list, turnover_list, size_list, tot_asset_list, cum_sum, illiquidity))
 
 with open('Final Variables/ticker_selected.txt', 'w') as file:
     for element in intersection_result:
@@ -56,39 +59,49 @@ for file in file_list:
         data.index = data.index.to_period("M")
         data = data[ (data.index <= '2022-12') & (data.index >= '2014-01')]
         filtered_data = data.filter(intersection_result, axis=1)
+        filtered_data = filtered_data[intersection_result]
         output_filename = f"monthly_{file}.csv"
         save_path = os.path.join('Final Variables', file)
         filtered_data.to_csv(save_path)
         
 gross_profit = gross_profit.filter(intersection_result, axis=1)
+gross_profit = gross_profit[intersection_result]
 filtered_data.to_csv('Final Variables/annual_gross_profit.csv')
 
 PB = PB.filter(intersection_result, axis=1)
+PB = PB[intersection_result]
 PB.to_csv('Final Variables/annual_PB.csv')
 
 turnover = turnover.filter(intersection_result, axis=1)
+turnover = turnover[intersection_result]
 turnover.to_csv('Final Variables/annual_turnover.csv')
 
 size = size.filter(intersection_result, axis=1)
+size = size[intersection_result]
 size.to_csv('Final Variables/annual_size.csv')
 
 tot_asset = tot_asset.filter(intersection_result, axis=1)
+tot_asset = tot_asset[intersection_result]
 tot_asset.to_csv('Final Variables/annual_tot_asset.csv')
 
 volume = pd.read_csv('filtered_data/volume_data_sp500.csv', index_col=0)
 volume = volume.filter(intersection_result, axis=1)
+volume = volume[intersection_result]
 volume.to_csv('Final Variables/monthly_Volume.csv')
     
-cum_sum = pd.read_csv('original data/control variables/cumsum_6mo.csv', index_col=0)
 cum_sum.index = pd.to_datetime(cum_sum.index)
 cum_sum.index = cum_sum.index.to_period("M")
 cum_sum = cum_sum[ (cum_sum.index <= '2022-12') & (cum_sum.index >= '2014-01')]
+cum_sum = cum_sum.filter(intersection_result, axis=1)
+cum_sum = cum_sum[intersection_result]
 cum_sum.to_csv('Final Variables/monthly_cum_sum.csv')
 
-illiquidity = pd.read_csv('original data/control variables/illiquidity.csv', index_col=0)
 illiquidity.index = pd.to_datetime(illiquidity.index)
 illiquidity.index = illiquidity.index.to_period("M")
 illiquidity = illiquidity[ (illiquidity.index <= '2022-12') & (illiquidity.index >= '2014-01')]
+illiquidity = illiquidity.filter(intersection_result, axis=1)
+illiquidity = illiquidity[intersection_result]
+
 illiquidity.to_csv('Final Variables/monthly_illiquidity.csv')
 
 
