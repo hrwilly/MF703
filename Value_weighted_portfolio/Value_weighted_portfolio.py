@@ -23,21 +23,21 @@ def rank_deciles(df):
     return df_ranks
 
 def calculate_value_weighted_returns(returns, market_caps, decile_ranks):
-    weighted_returns = pd.DataFrame(index=returns.index, columns=returns.columns)
+    decile_returns = pd.DataFrame(index=returns.index)
     
-    for stock in returns.columns:
-        for month in returns.index:
-            decile = decile_ranks.at[month, stock]
-            if pd.notnull(decile):
-                weighted_returns.at[month, stock] = returns.at[month, stock] * market_caps.at[month, stock]
-                
-    
-    decile_returns = pd.DataFrame(index=returns.index, columns=np.arange(10))
     for decile in range(10):
         decile_stocks = decile_ranks == decile
-        decile_returns[decile] = weighted_returns[decile_stocks].sum(axis=1) / market_caps[decile_stocks].sum(axis=1)
         
-    return decile_returns.dropna()
+        weighted_returns = returns.multiply(market_caps.where(decile_stocks, 0))
+        
+        sum_weighted_returns = weighted_returns.sum(axis=1)
+        sum_market_caps = market_caps.where(decile_stocks, 0).sum(axis=1)
+        
+        sum_market_caps.replace(0, np.nan, inplace=True)
+        
+        decile_returns[f'Decile_{decile}'] = sum_weighted_returns.divide(sum_market_caps)
+    
+    return decile_returns
 
 def filter_top_stocks_by_market_cap(market_cap_df, returns_df, percentile=0.99):
     """This function will filter out the top stocks by market cap."""
@@ -67,6 +67,12 @@ def format_significance(p_value):
         return '*'
     else:
         return ''
+
+def format_results(df):
+    df_numeric = df.select_dtypes(include=[np.number])
+    df[df_numeric.columns] = df_numeric.round(2)
+    df.fillna(0.00, inplace=True)
+    return df
 
 def calculate_regression_results(weighted_returns, market_factor, ff_factors):
     results = []
@@ -116,7 +122,11 @@ def calculate_regression_results(weighted_returns, market_factor, ff_factors):
         'FF3 Significance': format_significance(ff3_model_hl.pvalues['const'])
     })
 
-    return pd.DataFrame(results)
+    results_df = pd.DataFrame(results)
+    formatted_results = format_results(results_df)
+
+    return formatted_results
+
 
 
 def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_cap_df, ff_factors):
@@ -166,7 +176,7 @@ def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_cap_df, ff_f
         # Store results
         hedge_results.append({
             'Size Decile': decile_label,
-            'Raw Return': raw_return,
+            'Raw Return': raw_return*100,
             'CAPM Alpha': capm_alpha,
             'CAPM Alpha t-stat': capm_t_stat,
             'CAPM Significance': format_significance(capm_p_value),
@@ -174,15 +184,18 @@ def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_cap_df, ff_f
             'FF3 Alpha t-stat': ff3_t_stat,
             'FF3 Significance': format_significance(ff3_p_value)
         })
-        
-    return pd.DataFrame(hedge_results)
+    
+    formatted_hedge_results = pd.DataFrame(hedge_results)
+    formatted_hedge_results = format_results(formatted_hedge_results)
+    
+    return formatted_hedge_results
 
 
-returns_df = load_data('monthly_returns.csv', '2021-01', '2022-12')
-ff3_factors = load_data('ff3.csv', '2021-01', '2022-12')
-ab_nr_df = load_data('abnormal_negative_ratio.csv', '2021-01', '2022-12')
-ab_pr_df = load_data('abnormal_positive_ratio.csv', '2021-01', '2022-12')
-market_cap_df = load_data('monthly_size.csv', '2021-01', '2022-12')
+returns_df = load_data('monthly_returns.csv', '2014-01', '2022-12')
+ff3_factors = load_data('ff3.csv', '2014-01', '2022-12')
+ab_nr_df = load_data('abnormal_negative_ratio.csv', '2014-01', '2022-12')
+ab_pr_df = load_data('abnormal_positive_ratio.csv', '2014-01', '2022-12')
+market_cap_df = load_data('monthly_size.csv', '2014-01', '2022-12')
 market_factor = ff3_factors[['Mkt-RF']]
                             
 abnr_ranks = rank_deciles(ab_nr_df)
