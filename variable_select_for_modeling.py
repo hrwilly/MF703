@@ -120,6 +120,7 @@ def expand_annual_data_to_monthly(annual_data, year_column_name):
 
 monthly_size = expand_annual_data_to_monthly(size, 'Unnamed: 0')
 monthly_PB = expand_annual_data_to_monthly(PB, 'Unnamed: 0')
-
+monthly_tot_asset = expand_annual_data_to_monthly(tot_asset, 'Unnamed: 0')
 monthly_size.to_csv('Final Variables/monthly_size.csv')
 monthly_PB.to_csv('Final Variables/monthly_PB.csv')
+monthly_tot_asset.to_csv('Final Variables/monthly_tot_asset.csv')
