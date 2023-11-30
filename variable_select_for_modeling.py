@@ -110,17 +110,27 @@ def expand_annual_data_to_monthly(annual_data, year_column_name):
     if not np.issubdtype(annual_data.index.dtype, np.integer):
         raise ValueError("Index must be of integer type representing years.")
     annual_data.index.name = 'Year'
-    monthly_data = pd.DataFrame()
+    
+    # Convert all columns to numeric, coerce errors to NaNs
+    annual_data = annual_data.apply(pd.to_numeric, errors='coerce')
+    
+    # Forward-fill and Backward-fill to handle missing data at the beginning or end
+    annual_data.fillna(method='ffill', axis=0, inplace=True)  # Forward-fill
+    annual_data.fillna(method='bfill', axis=0, inplace=True)  # Backward-fill
+
+    monthly_data_list = []
+
     for year in annual_data.index:
-        year_data = pd.DataFrame(np.tile(annual_data.loc[year].values, (12, 1)), 
+        year_data = pd.DataFrame(np.tile(annual_data.loc[year].values, (12, 1)),
                                  columns=annual_data.columns)
         year_data.index = pd.date_range(start=f'{year}-01-01', periods=12, freq='M')
-        monthly_data = monthly_data.append(year_data)
+        monthly_data_list.append(year_data)
+    
+    monthly_data = pd.concat(monthly_data_list)
     return monthly_data
 
+
 monthly_size = expand_annual_data_to_monthly(size, 'Unnamed: 0')
-monthly_size  = monthly_size.apply(pd.to_numeric,errors='coerce')
-monthly_size.fillna(0, inplace=True)
 monthly_PB = expand_annual_data_to_monthly(PB, 'Unnamed: 0')
 monthly_tot_asset = expand_annual_data_to_monthly(tot_asset, 'Unnamed: 0')
 
