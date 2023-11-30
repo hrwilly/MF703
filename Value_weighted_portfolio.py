@@ -4,6 +4,7 @@ Created on Tue Nov 28 10:00:43 2023
 @author: LiangJiali
 """
 
+
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -88,7 +89,6 @@ def calculate_regression_results(weighted_returns, market_factor, ff_factors):
         results.append({
             'Decile': 'Low' if decile == 0 else 'High' if decile == 9 else decile,
             'Raw Return': decile_returns.mean(),
-            't-stat': '({:.2f})'.format(decile_returns.std()),
             'CAPM Alpha': capm_alpha,
             'CAPM t-stat': '({:.2f})'.format(float(capm_t_stat)),
             'CAPM Significance': format_significance(capm_p_value),
@@ -108,7 +108,6 @@ def calculate_regression_results(weighted_returns, market_factor, ff_factors):
     results.append({
         'Decile': 'H-L',
         'Raw Return': hl_returns.mean(),
-        't-stat': '({:.2f})'.format(hl_returns.std()),
         'CAPM Alpha': capm_model_hl.params['const'],
         'CAPM t-stat': '({:.2f})'.format(capm_model_hl.tvalues['const']),
         'CAPM Significance': format_significance(capm_model_hl.pvalues['const']),
@@ -120,49 +119,70 @@ def calculate_regression_results(weighted_returns, market_factor, ff_factors):
     return pd.DataFrame(results)
 
 
-def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_factor, ff_factors):
+def calculate_hedged_portfolio_returns(returns_df, ranks_df, market_cap_df, ff_factors):
+    market_cap_deciles = market_cap_df.rank(axis=1, method='min', pct=True)
+    market_cap_deciles = pd.qcut(market_cap_deciles.stack(), 10, labels=False, duplicates='drop').unstack()
 
-    def get_quintiles_within_decile(decile_rank):
-        decile_df = returns_df.where(ranks_df == decile_rank)
-        quantiles = decile_df.rank(axis=1, method='first', pct=True)
-        highest_quantile = decile_df.where(quantiles > 0.8).mean(axis=1)
-        lowest_quantile = decile_df.where(quantiles <= 0.2).mean(axis=1)
-        return highest_quantile, lowest_quantile
+    hedge_results = []
 
-    results = []
+    for decile in range(10):
+        # format decile label
+        decile_label = 'L' if decile == 0 else 'H' if decile == 9 else decile + 1
+        
+        # Get the stocks for the current market cap decile
+        size_decile_stocks = market_cap_deciles == decile
+        size_decile_returns = returns_df[size_decile_stocks]
+        
+        # Rank stocks based on AB_NR within each market cap decile
+        ab_nr_within_decile = ranks_df[size_decile_stocks].stack().groupby(level=0).rank(pct=True)
 
-    # Iterate through each decile
-    for decile_rank in range(10):
-        high, low = get_quintiles_within_decile(decile_rank)
-        hedged_returns = high - low
+        # Define high and low AB_NR stocks within the decile
+        high_ab_nr_stocks = ab_nr_within_decile[ab_nr_within_decile > 0.9].index.get_level_values(1)
+        low_ab_nr_stocks = ab_nr_within_decile[ab_nr_within_decile < 0.1].index.get_level_values(1)
 
-        # Calculate t-stat for Raw Return
-        raw_return_t_stat = hedged_returns.mean() / hedged_returns.std()
+        # Weight the returns by market cap and calculate the weighted returns
+        high_weighted_returns_sum = size_decile_returns[high_ab_nr_stocks].mul(market_cap_df[high_ab_nr_stocks]).sum(axis=1)
+        low_weighted_returns_sum = size_decile_returns[low_ab_nr_stocks].mul(market_cap_df[low_ab_nr_stocks]).sum(axis=1)
+        total_high_market_cap = market_cap_df[high_ab_nr_stocks].sum(axis=1)
+        total_low_market_cap = market_cap_df[low_ab_nr_stocks].sum(axis=1)
+        high_value_weighted_returns = high_weighted_returns_sum / total_high_market_cap
+        low_value_weighted_returns = low_weighted_returns_sum / total_low_market_cap
 
-        # Perform CAPM and FF3 regressions on the hedged returns
-        capm_model = perform_regression(hedged_returns, market_factor, 'CAPM')
-        ff3_model = perform_regression(hedged_returns, ff_factors, 'FF3')
+        hedged_returns = high_value_weighted_returns - low_value_weighted_returns
+        raw_return = hedged_returns.mean()
 
-        # Gather results
-        results.append({
-            'Decile': 'L' if decile_rank == 0 else 'H' if decile_rank == 9 else decile_rank,
-            'Raw Return': hedged_returns.mean(),
-            'Raw Return t-stat': raw_return_t_stat,
-            'CAPM Alpha': capm_model.params['const'],
-            'CAPM Significance': format_significance(capm_model.pvalues['const']),
-            'FF3 Alpha': ff3_model.params['const'],
-            'FF3 Significance': format_significance(ff3_model.pvalues['const'])
+        # Perform CAPM regression
+        capm_model = perform_regression(hedged_returns, ff_factors[['Mkt-RF', 'RF']], 'CAPM')
+        capm_alpha = capm_model.params['const']
+        capm_t_stat = capm_model.tvalues['const']
+        capm_p_value = capm_model.pvalues['const']
+        
+        # Perform FF3 regression
+        ff3_model = perform_regression(hedged_returns, ff_factors[['Mkt-RF', 'SMB', 'HML', 'RF']], 'FF3')
+        ff3_alpha = ff3_model.params['const']
+        ff3_t_stat = ff3_model.tvalues['const']
+        ff3_p_value = ff3_model.pvalues['const']
+
+        # Store results
+        hedge_results.append({
+            'Size Decile': decile_label,
+            'Raw Return': raw_return,
+            'CAPM Alpha': capm_alpha,
+            'CAPM Alpha t-stat': capm_t_stat,
+            'CAPM Significance': format_significance(capm_p_value),
+            'FF3 Alpha': ff3_alpha,
+            'FF3 Alpha t-stat': ff3_t_stat,
+            'FF3 Significance': format_significance(ff3_p_value)
         })
+        
+    return pd.DataFrame(hedge_results)
 
-    results_df = pd.DataFrame(results)
-    return results_df
 
-returns_df = load_data('monthly_returns-2.csv', '2022-01', '2023-10')
-ff3_factors = load_data('ff3.csv', '2022-01', '2023-10')
-ab_nr_df = load_data('abnormal_negative_ratio.csv', '2022-01', '2023-10')
-ab_pr_df = load_data('abnormal_positive_ratio.csv', '2022-01', '2023-10')
-market_cap_df = load_data('dummy_market_caps.csv', '2022-01', '2023-10')
-
+returns_df = load_data('monthly_returns-2.csv', '2021-01', '2022-12')
+ff3_factors = load_data('ff3.csv', '2021-01', '2022-12')
+ab_nr_df = load_data('abnormal_negative_ratio.csv', '2021-01', '2022-12')
+ab_pr_df = load_data('abnormal_positive_ratio.csv', '2021-01', '2022-12')
+market_cap_df = load_data('dummy_market_caps.csv', '2021-01', '2022-12')
 market_factor = ff3_factors[['Mkt-RF']]
                             
 abnr_ranks = rank_deciles(ab_nr_df)
@@ -171,22 +191,19 @@ abpr_ranks = rank_deciles(ab_pr_df)
 # value-weighted portfolio
 vw_returns_ab_nr = calculate_value_weighted_returns(returns_df, market_cap_df, abnr_ranks)
 vw_returns_ab_pr = calculate_value_weighted_returns(returns_df, market_cap_df, abpr_ranks)
-
 regression_results_ab_nr = calculate_regression_results(vw_returns_ab_nr, market_factor, ff3_factors)
 regression_results_ab_pr = calculate_regression_results(vw_returns_ab_pr, market_factor, ff3_factors)
 
 # Filter out the top 1% stocks by market cap for each time period
 filtered_market_caps, filtered_returns = filter_top_stocks_by_market_cap(market_cap_df, returns_df, 0.99)
-
 filtered_vw_returns_ab_nr = calculate_value_weighted_returns(filtered_returns, filtered_market_caps, abnr_ranks)
 filtered_vw_returns_ab_pr = calculate_value_weighted_returns(filtered_returns, filtered_market_caps, abpr_ranks)
-
 filtered_regression_results_ab_nr = calculate_regression_results(filtered_vw_returns_ab_nr, market_factor, ff3_factors)
 filtered_regression_results_ab_pr = calculate_regression_results(filtered_vw_returns_ab_pr, market_factor, ff3_factors)
 
 # hedged portfolio
-hedged_abnr = calculate_hedged_portfolio_returns(returns_df, abnr_ranks,market_factor, ff3_factors)
-hedged_abpr = calculate_hedged_portfolio_returns(returns_df, abpr_ranks,market_factor, ff3_factors)
+hedged_abnr = calculate_hedged_portfolio_returns(returns_df, abnr_ranks, market_cap_df, ff3_factors)
+hedged_abpr = calculate_hedged_portfolio_returns(returns_df, abpr_ranks, market_cap_df, ff3_factors)
 
 regression_results_ab_nr.to_csv('value_weighted_ab_nr.csv')
 regression_results_ab_pr.to_csv('value_weighted_ab_pr.csv')
