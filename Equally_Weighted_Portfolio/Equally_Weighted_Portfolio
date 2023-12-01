@@ -1,0 +1,216 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[507]:
+
+
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+import statistics
+
+
+# In[508]:
+
+
+def load_data(file_path, start_date, end_date):
+    df = pd.read_csv(file_path, index_col=0)
+    if df.index.dtype == int:
+        df.index = pd.to_datetime(df.index, format='%Y%m')
+    df.index = pd.to_datetime(df.index).to_period('M')
+    df = df.loc[start_date : end_date]
+    return df
+
+
+# In[537]:
+
+
+monthly_rt = load_data("C:/Users/rijul/Downloads/monthly_returns.csv", "01-2014","06-2014")
+abr_nr = load_data("C:/Users/rijul/Downloads/abnormal_negative_ratio.csv","01-2014","06-2014")
+market_cap = load_data("C:/Users/rijul/Downloads/monthly_size.csv","01-2014","06-2014")
+
+
+# In[556]:
+
+
+ff_factors = pd.read_csv("C:/Users/rijul/Downloads/ff3.csv")
+
+
+# In[557]:
+
+
+ff_factors.set_index('Date', inplace=True)
+ff_factors= ff_factors.loc[201401:201406]
+
+
+# In[558]:
+
+
+ff_factors
+
+
+# In[629]:
+
+
+def two_way_sorting(df, abnr_df, monthly_df):
+    df_deciles = df.rank(axis=1, method='min', pct=True)
+    df_deciles = pd.qcut(df_deciles.stack(), 10, labels=False, duplicates='drop').unstack()
+    
+    hedge_portfolio = []
+    hedged_returns = []
+    
+    for index, row in df_deciles.iterrows():
+        monthly_deciles = df_deciles.loc[index]
+        returns_mon = monthly_df.loc[index]
+        abnr_mon = abnr_df.loc[index]
+        mean_deciles = []
+        
+        for decile in range(10):
+            quintile_returns = []
+            # format decile label
+            decile_label = 'L' if decile == 0 else 'H' if decile == 9 else decile + 1
+
+            # Get the stocks for the current market cap decile
+            size_decile_stocks = monthly_deciles[monthly_deciles == decile].index
+            size_decile_returns = returns_mon[size_decile_stocks]
+            
+            # Rank stocks based on AB_NR within each market cap decile
+            abnr_within_decile = abnr_mon[size_decile_stocks]
+            df_abnr = abnr_within_decile.transform(lambda x: x.rank(method='min', pct=True))
+            abnr_quintiles = pd.qcut(df_abnr, 5, labels=False)
+            
+            
+            for quintile in range(5):
+                # format quintile label
+                quintile_label = 'L' if quintile == 0 else 'H' if quintile == 4 else quintile + 1
+
+                # Get the stocks for the current quintile
+                quintile_stocks = abnr_quintiles[abnr_quintiles == quintile].index
+                
+                # Calculate equally weighted returns for the quintile
+                size_quintile_returns = returns_mon[quintile_stocks]
+                x_mean = size_quintile_returns.mean()
+                
+                # Define high and low AB_NR stocks within the quintiles
+                abnr_stocks_mon = abnr_mon[quintile_stocks].transform(lambda x: x.rank(method='min', pct=True))
+   
+                high_ab_nr_stocks = size_quintile_returns[abnr_stocks_mon > 0.9].index
+                low_ab_nr_stocks = size_quintile_returns[abnr_stocks_mon < 0.1].index
+                
+                # Equally Weighted Returns:
+                if not high_ab_nr_stocks.empty and not low_ab_nr_stocks.empty:
+                    quintile_return = returns_mon[high_ab_nr_stocks].mean() - returns_mon[low_ab_nr_stocks].mean()
+                else:
+                    if high_ab_nr_stocks.empty:
+                        quintile_return = - returns_mon[low_ab_nr_stocks].mean()
+                    if low_ab_nr_stocks.empty:
+                        quintile_return = returns_mon[high_ab_nr_stocks].mean()
+                
+                quintile_returns.append(quintile_return)
+            mean_deciles.append(statistics.mean(quintile_returns))
+    
+        hedged_returns.append(mean_deciles)
+    
+    # Sum up all the lists
+    summed_list = [sum(values) for values in zip(*hedged_returns)]
+
+    # Calculate the average
+    raw_returns = [value / len(hedged_returns) for value in summed_list]
+    
+    return hedged_returns, raw_returns
+
+
+# In[630]:
+
+
+hedged_ret, raw_ret = two_way_sorting(market_cap, abr_nr, monthly_rt)
+
+
+# In[631]:
+
+
+def perform_regression(Y, X, regression_type='CAPM'):
+    if regression_type == 'CAPM':
+        X = sm.add_constant(X['Mkt-RF'])  
+    elif regression_type == 'FF3':
+        X = sm.add_constant(X[['Mkt-RF', 'SMB', 'HML']])  
+    else:
+        raise ValueError("Invalid regression type specified.")
+
+    model = sm.OLS(Y, X).fit(cov_type='HAC', cov_kwds={'maxlags': 12})
+    return model
+
+
+# In[632]:
+
+
+df_hedged = pd.DataFrame(hedged_ret, index=ff_factors.index)
+
+
+# In[633]:
+
+
+df_hedged
+
+
+# In[635]:
+
+
+ff_factors[['Mkt-RF', 'RF']]
+
+
+# In[642]:
+
+
+def format_significance(p_value):
+    if p_value < 0.01:
+        return '***'
+    elif p_value < 0.05:
+        return '**'
+    elif p_value < 0.1:
+        return '*'
+    else:
+        return ''
+
+
+# In[646]:
+
+
+hedge_results = []
+decile_label = ["L", "2", "3", "4", "5", "6", "7", "8", "9", "H"]
+
+# Perform CAPM regression
+for i in range(10):
+    capm_model = perform_regression(df_hedged.iloc[:, i], ff_factors[['Mkt-RF', 'RF']], 'CAPM')
+    capm_alpha = capm_model.params['const']
+    capm_t_stat = capm_model.tvalues['const']
+    capm_p_value = capm_model.pvalues['const']
+        
+    # Perform FF3 regression
+    ff3_model = perform_regression(df_hedged.iloc[:, i], ff_factors[['Mkt-RF', 'SMB', 'HML', 'RF']], 'FF3')
+    ff3_alpha = ff3_model.params['const']
+    ff3_t_stat = ff3_model.tvalues['const']
+    ff3_p_value = ff3_model.pvalues['const']
+
+    # Store results
+    hedge_results.append({
+        'Size Decile': decile_label[i],
+        'Raw Return': raw_ret[i],
+        'CAPM Alpha': capm_alpha,
+        'CAPM Alpha t-stat': capm_t_stat,
+        'CAPM Significance': format_significance(capm_p_value),
+        'FF3 Alpha': ff3_alpha,
+        'FF3 Alpha t-stat': ff3_t_stat,
+        'FF3 Significance': format_significance(ff3_p_value)
+    })
+
+results = pd.DataFrame(hedge_results)
+
+
+# In[647]:
+
+
+results
+
+
+# In[ ]:
