@@ -8,9 +8,7 @@ Created on Thu Nov 30 15:25:15 2023
 
 
 import pandas as pd
-import numpy as np
-import statsmodels.api as sm
-import os
+
 
 def load_data(file_path, start_date , end_date):
     df = pd.read_csv(file_path, index_col=0)
@@ -87,7 +85,7 @@ variables = ['PR','NR', 'ABPR', 'ABNR', 'RET', 'RET_OC_M', 'RET_CO_M', 'SIZE', '
 summary_stats_additional = pd.concat([summary_stats(pos_means), summary_stats(neg_means), summary_stats(ab_pos_means), summary_stats(ab_neg_means),summary_stats(ret_means), summary_stats(ret_oc_m_means), summary_stats(ret_co_m_means), summary_stats(size_means), summary_stats(ret_6m_means) ,summary_stats(gpa_means), summary_stats(illiq_m_means)], keys=variables, axis=1).transpose()
 summary_stats_additional.index = summary_stats_additional.index.droplevel(1)
 
-summary_stats_additional.to_csv('summary statistic/table1.csv')
+summary_stats_additional.to_csv('Table_3_A.csv')
 
 
 pos_means_df = pd.DataFrame(pos_means, columns=['PR'])
@@ -119,7 +117,7 @@ additional_data_df = pd.concat([pos_means_df, neg_means_df, ab_pos_means_df, ab_
                                 lead_pos_means_df, lead_neg_means_df, lead_ab_pos_means_df, lead_ab_neg_means_df, lead_ret_means_df, lead_ret_oc_m_means_df, lead_ret_co_m_means_df, lead_size_means_df, lead_ret_6m_means_df ,lead_gpa_means_df,illiq_m_means_df],axis=1)
 additional_correlation_matrix = additional_data_df.corr()
 
-additional_correlation_matrix.to_csv('summary statistic/table2.csv')
+additional_correlation_matrix.to_csv('Table_3_B.csv')
 
 # Printing the Summary Stats:
     
