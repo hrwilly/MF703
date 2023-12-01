@@ -42,13 +42,13 @@ NR_ratio = neg_reversal.groupby(neg_reversal.index).mean()
 AB_PR = PR_ratio.rolling(window=12).mean()
 AB_PR = AB_PR[AB_PR.index >= '2014-01']
 PR_ratio = PR_ratio[PR_ratio.index >= '2014-01']
-AB_PR = PR_ratio / AB_PR 
+AB_PR = PR_ratio * AB_PR 
 
 
 AB_NR = NR_ratio.rolling(window=12).mean()
 AB_NR = AB_NR[AB_NR.index >= '2014-01']
 NR_ratio = NR_ratio[NR_ratio.index >= '2014-01']
-AB_NR = NR_ratio / AB_NR
+AB_NR = NR_ratio * AB_NR
 
 
 
