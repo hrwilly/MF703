@@ -29,8 +29,8 @@ def lag_lead_operations(df, lag_date, lead_date):
 
 def summary_stats(df):
     
-    column_stats = pd.DataFrame([df.mean(), df.std(), df.skew(), df.kurt(), df.min(), df.quantile(0.01), df.quantile(0.05), df.quantile(0.1), df.quantile(0.25), df.quantile(0.5), df.quantile(0.75), df.quantile(0.9), df.quantile(0.95), df.quantile(0.99), df.max()])
-    column_stats.index = ['Mean', 'SD', 'Skew', 'Kurt', 'Min', '1%', '5%', '10%', '25%', 'Median', '75%', '90%', '95%', '99%', 'Max']
+    column_stats = pd.DataFrame([df.mean(), df.std(), df.min(), df.quantile(0.25), df.quantile(0.5), df.quantile(0.75), df.max()])
+    column_stats.index = ['Mean', 'SD', 'Min', '25%', 'Median', '75%', 'Max']
     
     return column_stats
 
@@ -86,8 +86,8 @@ illiq_m_means = illiq_m_lag.mean()
 variables = ['PR','NR', 'ABPR', 'ABNR', 'RET', 'RET_OC_M', 'RET_CO_M', 'SIZE', 'RET_6M','GPA','ILLIQ_M']
 summary_stats_additional = pd.concat([summary_stats(pos_means), summary_stats(neg_means), summary_stats(ab_pos_means), summary_stats(ab_neg_means),summary_stats(ret_means), summary_stats(ret_oc_m_means), summary_stats(ret_co_m_means), summary_stats(size_means), summary_stats(ret_6m_means) ,summary_stats(gpa_means), summary_stats(illiq_m_means)], keys=variables, axis=1).transpose()
 summary_stats_additional.index = summary_stats_additional.index.droplevel(1)
-print(summary_stats_additional)
-#summary_stats_additional.to_csv('summary statistic/table1.csv')
+
+summary_stats_additional.to_csv('summary statistic/table1.csv')
 
 
 pos_means_df = pd.DataFrame(pos_means, columns=['PR'])
@@ -117,7 +117,11 @@ lead_illiq_m_means_df = pd.DataFrame(illiq_m_lead.mean(), columns=['Lead_ILLIQ_M
 
 additional_data_df = pd.concat([pos_means_df, neg_means_df, ab_pos_means_df, ab_neg_means_df,ret_means_df, ret_oc_m_means_df, ret_co_m_means_df, size_means_df,ret_6m_means_df ,gpa_means_df,illiq_m_means_df,
                                 lead_pos_means_df, lead_neg_means_df, lead_ab_pos_means_df, lead_ab_neg_means_df, lead_ret_means_df, lead_ret_oc_m_means_df, lead_ret_co_m_means_df, lead_size_means_df, lead_ret_6m_means_df ,lead_gpa_means_df,illiq_m_means_df],axis=1)
-
 additional_correlation_matrix = additional_data_df.corr()
+
+additional_correlation_matrix.to_csv('summary statistic/table2.csv')
+
+# Printing the Summary Stats:
+    
+print(summary_stats_additional)
 print(additional_correlation_matrix)
-#additional_correlation_matrix.to_csv('summary statistic/table2.csv')
