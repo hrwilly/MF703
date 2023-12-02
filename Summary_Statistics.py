@@ -1,12 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Nov 29 20:26:18 2023
-
-@author: liyihan
-"""
-
 import pandas as pd
+import numpy as np
+from finance_byu import fama_macbeth
+import warnings
+warnings.filterwarnings("ignore")
 
 ab_pos = pd.read_csv('Final Variables/abnormal_positive_ratio.csv', index_col=0)
 ab_neg = pd.read_csv('Final Variables/abnormal_negative_ratio.csv', index_col=0)

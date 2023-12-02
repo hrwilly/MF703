@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Nov 30 15:25:15 2023
+
+@author: aadiljaved
+"""
+
+
+import pandas as pd
+
+
+def load_data(file_path, start_date , end_date):
+    df = pd.read_csv(file_path, index_col=0)
+    if df.index.dtype == int:
+        df.index = pd.to_datetime(df.index, format='%Y%m')
+    df.index = pd.to_datetime(df.index).to_period('M')
+    df = df.loc[start_date : end_date]
+    df.index.name = 'Date'
+    #df = df.rename_axis('Date')
+    return df
+
+def lag_lead_operations(df, lag_date, lead_date):
+    df_lag = df[df.index <= lag_date]
+    df_lead = df.iloc[1:(len(df_lag) + 1)]
+    return df_lag, df_lead
+
+def summary_stats(df):
+    
+    column_stats = pd.DataFrame([df.mean(), df.std(), df.min(), df.quantile(0.25), df.quantile(0.5), df.quantile(0.75), df.max()])
+    column_stats.index = ['Mean', 'SD', 'Min', '25%', 'Median', '75%', 'Max']
+    
+    return column_stats
+
+# Specifying Start & End Date:
+    
+start_date = '2021-01'
+end_date = '2022-12'
+
+# Data Loading:
+    
+pos = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/positive_ratio.csv',start_date,end_date)
+neg = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/negative_ratio.csv',start_date,end_date)
+ab_pos = load_data('//Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/abnormal_positive_ratio.csv',start_date,end_date)
+ab_neg = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/abnormal_negative_ratio.csv',start_date,end_date)
+ret = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/monthly_returns.csv',start_date,end_date)
+ret_oc_m = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/daytime_returns.csv',start_date,end_date)
+ret_co_m = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/overnight_returns.csv',start_date,end_date)
+size = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/monthly_size-2.csv',start_date,end_date)
+gpa = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/annual_gross_profit.csv',start_date,end_date)
+ret_6m = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/monthly_cum_sum.csv',start_date,end_date)
+illiq_m = load_data('/Users/aadiljaved/Desktop/Coursework/Programming - MF 703/Project/monthly_illiquidity.csv',start_date,end_date)
+
+# Creating Lag & Lead:
+
+pos_lag, pos_lead = lag_lead_operations(pos, '2021-12-31', None)
+neg_lag, neg_lead = lag_lead_operations(neg, '2021-12-31', None)
+ab_pos_lag, ab_pos_lead = lag_lead_operations(ab_pos, '2021-12-31', None)
+ab_neg_lag, ab_neg_lead = lag_lead_operations(ab_neg, '2021-12-31', None)
+ret_lag, ret_lead = lag_lead_operations(ret, '2021-12-31', None)
+ret_oc_m_lag, ret_oc_m_lead = lag_lead_operations(ret_oc_m, '2021-12-31', None)
+ret_co_m_lag, ret_co_m_lead = lag_lead_operations(ret_co_m, '2021-12-31', None)
+size_lag, size_lead = lag_lead_operations(size, '2021-12-31', None)
+ret_6m_lag, ret_6m_lead = lag_lead_operations(ret_6m, '2021-12-31', None)
+gpa_lag, gpa_lead = lag_lead_operations(gpa, '2021-12-31', None)
+illiq_m_lag, illiq_m_lead = lag_lead_operations(illiq_m, '2021-12-31', None)
+
+
+# Calculating Mean:
+pos_means = pos_lag.mean()
+neg_means = neg_lag.mean()
+ab_pos_means = ab_pos_lag.mean()
+ab_neg_means = ab_neg_lag.mean()
+ret_means = ret_lag.mean()
+ret_oc_m_means = ret_oc_m_lag.mean()
+ret_co_m_means = ret_co_m_lag.mean()
+size_means = size_lag.mean()
+ret_6m_means = ret_6m_lag.mean()
+gpa_means = gpa_lag.mean()
+illiq_m_means = illiq_m_lag.mean()
+
+# Summary Statistics:
+    
+variables = ['PR','NR', 'ABPR', 'ABNR', 'RET', 'RET_OC_M', 'RET_CO_M', 'SIZE', 'RET_6M','GPA','ILLIQ_M']
+summary_stats_additional = pd.concat([summary_stats(pos_means), summary_stats(neg_means), summary_stats(ab_pos_means), summary_stats(ab_neg_means),summary_stats(ret_means), summary_stats(ret_oc_m_means), summary_stats(ret_co_m_means), summary_stats(size_means), summary_stats(ret_6m_means) ,summary_stats(gpa_means), summary_stats(illiq_m_means)], keys=variables, axis=1).transpose()
+summary_stats_additional.index = summary_stats_additional.index.droplevel(1)
+
+summary_stats_additional.to_csv('Table_3_A.csv')
+
+
+pos_means_df = pd.DataFrame(pos_means, columns=['PR'])
+neg_means_df = pd.DataFrame(neg_means, columns=['NR'])
+ab_pos_means_df = pd.DataFrame(ab_pos_means, columns=['ABPR'])
+ab_neg_means_df = pd.DataFrame(ab_neg_means, columns=['ABNR'])
+ret_means_df = pd.DataFrame(ret_means, columns=['RET'])
+ret_oc_m_means_df = pd.DataFrame(ret_oc_m_means, columns=['RET_OC_M'])
+ret_co_m_means_df = pd.DataFrame(ret_co_m_means, columns=['RET_CO_M'])
+size_means_df = pd.DataFrame(size_means, columns=['SIZE'])
+ret_6m_means_df = pd.DataFrame(size_means, columns=['RET_6M'])
+gpa_means_df = pd.DataFrame(gpa_means, columns=['GPA'])
+illiq_m_means_df = pd.DataFrame(illiq_m_means, columns=['ILLIQ_M'])
+
+lead_pos_means_df = pd.DataFrame(pos_lead.mean(), columns=['Lead_R'])
+lead_neg_means_df = pd.DataFrame(neg_lead.mean(), columns=['Lead_NR'])
+lead_ab_pos_means_df = pd.DataFrame(ab_pos_lead.mean(), columns=['Lead_ABPR'])
+lead_ab_neg_means_df = pd.DataFrame(ab_neg_lead.mean(), columns=['Lead_ABNR'])
+lead_ret_means_df = pd.DataFrame(ret_lead.mean(), columns=['Lead_RET'])
+lead_ret_oc_m_means_df = pd.DataFrame(ret_oc_m_lead.mean(), columns=['Lead_RET_OC_M'])
+lead_ret_co_m_means_df = pd.DataFrame(ret_co_m_lead.mean(), columns=['Lead_RET_CO_M'])
+lead_size_means_df = pd.DataFrame(size_lead.mean(), columns=['Lead_SIZE'])
+lead_ret_6m_means_df = pd.DataFrame(ret_6m_lead.mean(), columns=['Lead_RET_6M'])
+lead_gpa_means_df = pd.DataFrame(gpa_lead.mean(), columns=['Lead_GPA'])
+lead_illiq_m_means_df = pd.DataFrame(illiq_m_lead.mean(), columns=['Lead_ILLIQ_M'])
+
+
+additional_data_df = pd.concat([pos_means_df, neg_means_df, ab_pos_means_df, ab_neg_means_df,ret_means_df, ret_oc_m_means_df, ret_co_m_means_df, size_means_df,ret_6m_means_df ,gpa_means_df,illiq_m_means_df,
+                                lead_pos_means_df, lead_neg_means_df, lead_ab_pos_means_df, lead_ab_neg_means_df, lead_ret_means_df, lead_ret_oc_m_means_df, lead_ret_co_m_means_df, lead_size_means_df, lead_ret_6m_means_df ,lead_gpa_means_df,illiq_m_means_df],axis=1)
+additional_correlation_matrix = additional_data_df.corr()
+
+additional_correlation_matrix.to_csv('Table_3_B.csv')
+
+# Printing the Summary Stats:
+    
+print(summary_stats_additional)
+print(additional_correlation_matrix)
