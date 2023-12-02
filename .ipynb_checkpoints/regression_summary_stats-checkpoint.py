@@ -69,7 +69,7 @@ betas = np.mean(pd.DataFrame(data = d_beta))
 alphas = np.mean(pd.DataFrame(data = d_alpha))
 
 results_no_control = pd.concat([alphas.rename('Intercept'), betas.rename('Beta')], axis = 1)
-results_no_control = results_no_control.style.set_caption("Fama Macbeth without Control Variables")
+results_no_control.style.set_caption("Fama Macbeth without Control Variables")
 
 ret_co_m = pd.read_csv('variable_results/sp500/filtered_ret_co_m.csv')
 ret_oc_m = pd.read_csv('variable_results/sp500/filtered_ret_oc_m.csv')
@@ -85,7 +85,7 @@ ret_oc_m = correct_format(ret_oc_m)
 
 controls = []
 
-for ticker in size:
+for ticker in ret_co_m:
     data = pd.DataFrame()
     data['close to open'] = ret_co_m[ticker]
     data['open to close'] = ret_oc_m[ticker]
