@@ -27,6 +27,7 @@ def fama(data, shift_factor, control = []):
         comb[i]['index'] = pd.to_datetime(pd.to_datetime(comb[i]['index']).dt.strftime('%Y-%m'))
 
     results = []
+    sum = []
     tickers = data.columns        
 
     for i in range(len(comb)):
@@ -38,38 +39,56 @@ def fama(data, shift_factor, control = []):
                 xvar.append(comb[i].columns[j])
         comb[i] = comb[i].dropna(axis = 1, how = 'all')
         comb[i] = comb[i].dropna(axis = 0, how = 'any')
-        results.append(fama_macbeth.fama_macbeth_master(comb[i], t = 'index', yvar = 'future', xvar = xvar, intercept=True))
+        reg = fama_macbeth.fama_macbeth(comb[i], t = 'index', yvar = 'future', xvar = xvar, intercept = True)
+        sum.append(fama_macbeth.fm_summary(reg, pvalues = True))
+        results.append(fama_macbeth.fama_macbeth_master(comb[i], t = 'index', yvar = 'future', xvar = xvar, intercept = True))
 
-    alpha = []
     beta = []
     for i in range(len(results)):
-        alpha.append(results[i]['intercept'])
         beta.append(results[i][tickers[i]])
 
-    return alpha, beta, results
+    return beta, sum
 
 ab_neg.index = pd.to_datetime(ab_neg.index)
 ab_pos.index = pd.to_datetime(ab_pos.index)
 ab_neg = ab_neg.reindex(sorted(ab_neg.columns), axis=1)
 ab_pos = ab_pos.reindex(sorted(ab_pos.columns), axis=1)
 
-neg1_alpha, neg1_beta, neg1_results = fama(ab_neg, -1)
-neg2_alpha, neg2_beta, neg2_results = fama(ab_neg, -2)
-neg3_alpha, neg3_beta, neg3_results = fama(ab_neg, -3)
-pos1_alpha, pos1_beta, pos1_results = fama(ab_pos, -1)
-pos2_alpha, pos2_beta, pos2_results = fama(ab_pos, -2)
-pos3_alpha, pos3_beta, pos3_results = fama(ab_pos, -3)
+neg1b, neg1s = fama(ab_neg, -1)
+neg2b, neg2s = fama(ab_neg, -2)
+neg3b, neg3s = fama(ab_neg, -3)
+pos1b, pos1s = fama(ab_pos, -1)
+pos2b, pos2s = fama(ab_pos, -2)
+pos3b, pos3s = fama(ab_pos, -3)
 
-d_beta = {'ABNR 1mo' : neg1_beta, 'ABNR 2mo' : neg2_beta, 'ABNR 3mo' : neg3_beta, 
-          'ABPR 1mo' : pos1_beta, 'ABPR 2mo' : pos2_beta, 'ABPR 3mo' : pos3_beta}
-d_alpha = {'ABNR 1mo' : neg1_alpha, 'ABNR 2mo' : neg2_alpha, 'ABNR 3mo' : neg3_alpha, 
-          'ABPR 1mo' : pos1_alpha, 'ABPR 2mo' : pos2_alpha, 'ABPR 3mo' : pos3_alpha}
+def find_vals(data):
+    int = []
+    pval = []
+    for i in range(len(data)):
+        int.append(data[i]['mean'][0])
+        pval.append(data[i]['pval'][1])
+    return int, pval
 
-betas = np.mean(pd.DataFrame(data = d_beta))
+neg1a, neg1_pval = find_vals(neg1s)
+neg2a, neg2_pval = find_vals(neg2s)
+neg3a, neg3_pval = find_vals(neg3s)
+pos1a, pos1_pval = find_vals(pos1s)
+pos2a, pos2_pval = find_vals(pos2s)
+pos3a, pos3_pval = find_vals(pos3s)
+
+d_alpha = {'ABNR 1mo' : neg1a, 'ABNR 2mo' : neg2a, 'ABNR 3mo' : neg3a,
+           'ABPR 1mo' : pos1a, 'ABPR 2mo' : pos2a, 'ABPR 3mo' : pos3a}
+d_beta = {'ABNR 1mo' : neg1b, 'ABNR 2mo' : neg2b, 'ABNR 3mo' : neg3b,
+          'ABPR 1mo' : pos1b, 'ABPR 2mo' : pos2b, 'ABPR 3mo' : pos3b}
+d_pval = {'ABNR 1mo' : neg1_pval, 'ABNR 2mo' : neg2_pval, 'ABNR 3mo' : neg3_pval,
+          'ABPR 1mo' : pos1_pval, 'ABPR 2mo' : pos2_pval, 'ABPR 3mo' : pos3_pval}
+
 alphas = np.mean(pd.DataFrame(data = d_alpha))
+betas = np.mean(pd.DataFrame(data = d_beta))
+pvals = np.mean(pd.DataFrame(data = d_pval))
 
-results_no_control = pd.concat([alphas.rename('Intercept'), betas.rename('Beta')], axis = 1)
-results_no_control.style.set_caption("Fama Macbeth without Control Variables")
+res_n_c = pd.concat([alphas.rename('Intercept'), betas.rename('Beta'), pvals.rename('p')], axis = 1)
+res_n_c.style.set_caption("Fama Macbeth without Control Variables")
 
 ret_co_m = pd.read_csv('variable_results/sp500/filtered_ret_co_m.csv')
 ret_oc_m = pd.read_csv('variable_results/sp500/filtered_ret_oc_m.csv')
@@ -91,23 +110,33 @@ for ticker in ret_co_m:
     data['open to close'] = ret_oc_m[ticker]
     controls.append(data)
 
-neg1_alpha_c, neg1_beta_c, neg1_results_c = fama(ab_neg, -1, controls)
-neg2_alpha_c, neg2_beta_c, neg2_results_c = fama(ab_neg, -2, controls)
-neg3_alpha_c, neg3_beta_c, neg3_results_c = fama(ab_neg, -3, controls)
-pos1_alpha_c, pos1_beta_c, pos1_results_c = fama(ab_pos, -1, controls)
-pos2_alpha_c, pos2_beta_c, pos2_results_c = fama(ab_pos, -2, controls)
-pos3_alpha_c, pos3_beta_c, pos3_results_c = fama(ab_pos, -3, controls)
+neg1b_c, neg1s_c = fama(ab_neg, -1, controls)
+neg2b_c, neg2s_c = fama(ab_neg, -2, controls)
+neg3b_c, neg3s_c = fama(ab_neg, -3, controls)
+pos1b_c, pos1s_c = fama(ab_pos, -1, controls)
+pos2b_c, pos2s_c = fama(ab_pos, -2, controls)
+pos3b_c, pos3s_c = fama(ab_pos, -3, controls)
 
-d_beta_c = {'ABNR 1mo' : neg1_beta_c, 'ABNR 2mo' : neg2_beta_c, 'ABNR 3mo' : neg3_beta_c, 
-          'ABPR 1mo' : pos1_beta_c, 'ABPR 2mo' : pos2_beta_c, 'ABPR 3mo' : pos3_beta_c}
-d_alpha_c = {'ABNR 1mo' : neg1_alpha_c, 'ABNR 2mo' : neg2_alpha_c, 'ABNR 3mo' : neg3_alpha_c, 
-          'ABPR 1mo' : pos1_alpha_c, 'ABPR 2mo' : pos2_alpha_c, 'ABPR 3mo' : pos3_alpha_c}
+neg1a_c, neg1_pval_c = find_vals(neg1s_c)
+neg2a_c, neg2_pval_c = find_vals(neg2s_c)
+neg3a_c, neg3_pval_c = find_vals(neg3s_c)
+pos1a_c, pos1_pval_c = find_vals(pos1s_c)
+pos2a_c, pos2_pval_c = find_vals(pos2s_c)
+pos3a_c, pos3_pval_c = find_vals(pos3s_c)
 
-betas_c = np.mean(pd.DataFrame(data = d_beta_c))
+d_alpha_c = {'ABNR 1mo' : neg1a_c, 'ABNR 2mo' : neg2a_c, 'ABNR 3mo' : neg3a_c,
+             'ABPR 1mo' : pos1a_c, 'ABPR 2mo' : pos2a_c, 'ABPR 3mo' : pos3a_c}
+d_beta_c = {'ABNR 1mo' : neg1b_c, 'ABNR 2mo' : neg2b_c, 'ABNR 3mo' : neg3b_c,
+            'ABPR 1mo' : pos1b_c, 'ABPR 2mo' : pos2b_c, 'ABPR 3mo' : pos3b_c}
+d_pval_c = {'ABNR 1mo' : neg1_pval_c, 'ABNR 2mo' : neg2_pval_c, 'ABNR 3mo' : neg3_pval_c,
+            'ABPR 1mo' : pos1_pval_c, 'ABPR 2mo' : pos2_pval_c, 'ABPR 3mo' : pos3_pval_c}
+
 alphas_c = np.mean(pd.DataFrame(data = d_alpha_c))
+betas_c = np.mean(pd.DataFrame(data = d_beta_c))
+pvals_c = np.mean(pd.DataFrame(data = d_pval_c))
 
-results_w_control = pd.concat([alphas_c.rename('Intercept'), betas_c.rename('Beta')], axis = 1)
-results_w_control.style.set_caption("Fama Macbeth with Control Variables")
+res_w_c = pd.concat([alphas_c.rename('Intercept'), betas_c.rename('Beta'), pvals_c.rename('p')], axis = 1)
+res_w_c.style.set_caption("Fama Macbeth with Control Variables")
 
-results_no_control.to_csv('summary statistic/reg_no_control.csv')
-results_w_control.to_csv('summary statistic/reg_w_control.csv')
+res_n_c.to_csv('summary statistic/reg_no_control.csv')
+res_w_c.to_csv('summary statistic/reg_w_control.csv')
