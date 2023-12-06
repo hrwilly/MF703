@@ -140,3 +140,7 @@ res_w_c.style.set_caption("Fama Macbeth with Control Variables")
 
 res_n_c.to_csv('summary statistic/reg_no_control.csv')
 res_w_c.to_csv('summary statistic/reg_w_control.csv')
+
+idx = pd.IndexSlice
+slice_ = idx[:, 'Beta']
+res_w_c.style.set_properties(**{'background-color': 'khaki'}, subset=slice_)
